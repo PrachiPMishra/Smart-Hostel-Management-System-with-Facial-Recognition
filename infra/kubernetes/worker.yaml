@@ -1,0 +1,61 @@
+# Recognition Worker Deployment
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-config
+  namespace: hostel-management
+data:
+  BACKEND_URL: "http://backend:8000"
+  REDIS_URL: "redis://redis:6379/0"
+  MODEL_PATH: "/models/recognition_model.pkl"
+  PROCESSING_INTERVAL: "5"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recognition-worker
+  namespace: hostel-management
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: recognition-worker
+  template:
+    metadata:
+      labels:
+        app: recognition-worker
+    spec:
+      containers:
+      - name: worker
+        image: hostel-recognition-worker:latest
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: worker-config
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: models-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: models-pvc
+  namespace: hostel-management
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
